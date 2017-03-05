@@ -12,6 +12,7 @@ var record = require('./lib/record');
 var curl = require('./lib/curl');
 var debug = require('debug')('yakbak:server');
 
+
 /**
  * Returns a new yakbak proxy middleware.
  * @param {String} host The hostname to proxy to
@@ -70,7 +71,45 @@ module.exports = function (host, opts) {
  */
 
 function tapename(req, body) {
-  return hash.sync(req, Buffer.concat(body)) + '.js';
+
+  var version;
+  var service;
+  var method;
+  var token;
+  var urlParts = req.url.toString().split('/');
+  var tapeName;
+
+  if (urlParts[urlParts.length - 3] === 'oauth') {
+    debug('oauth request');
+    version = urlParts[urlParts.length - 2];
+    service = urlParts[urlParts.length - 3    ];
+    method = urlParts[urlParts.length - 1];
+
+    var bodyText = Buffer.concat(body).toString();
+    var matches = bodyText.match(/username=(.*?)&/i);
+    
+    if (matches && matches.length > 1) {
+      var userName = matches[1].toLowerCase();
+      debug('username', userName);
+      tapeName = service + '_' + method + '_' + version + '_' + userName + '.js';
+    }
+    else
+    {
+      debug('anonymous(or refresh?) oauth request');
+      tapeName = service + '_' + method + '_' + version + '_anonymous.js';
+    }
+
+  }
+  else {
+    debug('non oauth request');
+    version = urlParts[urlParts.length - 3];
+    service = urlParts[urlParts.length - 2];
+    method = urlParts[urlParts.length - 1];
+    token = req.headers['authorization'].split(' ')[1];
+    tapeName = service + '_' + method + '_' + version + '_' + token + '.js';
+  }
+
+  return tapeName;
 }
 
 /**
