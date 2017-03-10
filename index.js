@@ -11,6 +11,7 @@ var proxy = require('./lib/proxy');
 var record = require('./lib/record');
 var curl = require('./lib/curl');
 var debug = require('debug')('yakbak:server');
+var jsonpath = require('jsonpath');
 
 
 /**
@@ -41,7 +42,7 @@ module.exports = function (host, opts) {
           throw new RecordingDisabledError('Recording Disabled');
         } else {
           return proxy(req, body, host).then(function (pres) {
-            return record(pres.req, pres, file);
+            return record(req, pres, file);
           });
         }
 
@@ -70,6 +71,8 @@ module.exports = function (host, opts) {
  * @returns {String}
  */
 
+
+//TODO: add to separate file
 function tapename(req, body) {
 
   var version;
@@ -79,34 +82,45 @@ function tapename(req, body) {
   var urlParts = req.url.toString().split('/');
   var tapeName;
 
+
+  var bodyText = Buffer.concat(body).toString();
+
   if (urlParts[urlParts.length - 3] === 'oauth') {
     debug('oauth request');
     version = urlParts[urlParts.length - 2];
-    service = urlParts[urlParts.length - 3    ];
+    service = urlParts[urlParts.length - 3];
     method = urlParts[urlParts.length - 1];
 
-    var bodyText = Buffer.concat(body).toString();
     var matches = bodyText.match(/username=(.*?)&/i);
-    
+
     if (matches && matches.length > 1) {
       var userName = matches[1].toLowerCase();
       debug('username', userName);
       tapeName = service + '_' + method + '_' + version + '_' + userName + '.js';
     }
-    else
-    {
+    else {
       debug('anonymous(or refresh?) oauth request');
       tapeName = service + '_' + method + '_' + version + '_anonymous.js';
     }
 
   }
   else {
-    debug('non oauth request');
     version = urlParts[urlParts.length - 3];
     service = urlParts[urlParts.length - 2];
     method = urlParts[urlParts.length - 1];
     token = req.headers['authorization'].split(' ')[1];
-    tapeName = service + '_' + method + '_' + version + '_' + token + '.js';
+
+    tapeName = service + '_' + method + '_' + version + '_' + token;
+    var serviceMethodIdentifier = service + '_' + method;
+    var serviceMethodKeyData = keyData[serviceMethodIdentifier];
+
+      serviceMethodKeyData.forEach(function (jsonpathExpression) {
+        var keyValue = jsonpath.value(JSON.parse(bodyText), jsonpathExpression);
+        // If value not found undefined will be appended (this will help identify jsonpath errors)
+        tapeName += '_' + keyValue;
+      });
+
+    tapeName += '.js';
   }
 
   return tapeName;
@@ -134,3 +148,9 @@ function RecordingDisabledError(message) {
 }
 
 RecordingDisabledError.prototype = Object.create(Error.prototype);
+
+
+var keyData = {
+  "ConfigurationHelper_GetAppLaunchSettings":
+  ["$..mobilePlatform", "$..id"]
+};
