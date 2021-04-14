@@ -1,3 +1,17 @@
+# Andrew stoddart Enhancements
+
+## Uniquely Identifying Requests and Saving in Clear Text
+Remove gzip encoding from request sent from proxy to allow response to be written to tape in clear text (otherwise would have to add decoding logic)  
+Change tape encoding from base64 to UTF-8  
+Use jsonpath module to extract data from requests to uniquely identify requests  
+
+## Data Scrubbing 
+jsonpath used to identify sensitive data  
+Data can be replaced using one of the following means:  
+1. using faker.js with mustache string format entries
+2. single value specified
+3. array of values with item chosed randomly
+
 # yakbak
 
 Record HTTP interactions The Node Way™. Inspired by ruby's [vcr][1].
